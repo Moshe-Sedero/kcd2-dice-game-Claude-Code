@@ -325,6 +325,27 @@ export function useGameState() {
     bankAndPass,
   ]);
 
+  /**
+   * Select all dice matching a specific combo take, deselecting everything else.
+   * Replaces the current held state with exactly the dice in comboDice.
+   */
+  const selectCombo = useCallback((comboDice) => {
+    setState((prev) => {
+      if (prev.gamePhase !== 'selecting') return prev;
+      const remaining = [...comboDice];
+      const newDice = prev.dice.map((d) => {
+        if (d.isLocked) return d;
+        const idx = remaining.indexOf(d.value);
+        if (idx !== -1) {
+          remaining.splice(idx, 1);
+          return { ...d, isHeld: true };
+        }
+        return { ...d, isHeld: false };
+      });
+      return { ...prev, dice: newDice };
+    });
+  }, []);
+
   const resetGame = useCallback(() => {
     setState(initialState);
     setAiSelecting(false);
@@ -335,6 +356,7 @@ export function useGameState() {
     actions: {
       rollDice,
       toggleHold,
+      selectCombo,
       bankAndPass,
       continueRolling,
       resetGame,

@@ -1,6 +1,7 @@
 import { useGameState } from './hooks/useGameState';
 import Die from './components/Die';
 import GameOverlay from './components/GameOverlay';
+import ComboPanel from './components/ComboPanel';
 import { useState, useEffect, useRef } from 'react';
 
 // Progress bar toward target score (2000)
@@ -86,7 +87,7 @@ function PlayerPanel({ label, icon, total, lastBanked }) {
 export default function App() {
   const { state, actions } = useGameState();
   const { currentTurn, humanTotal, aiTotal, turnScore, dice, gamePhase, winner, lastBanked } = state;
-  const { rollDice, toggleHold, bankAndPass, continueRolling, resetGame } = actions;
+  const { rollDice, toggleHold, selectCombo, bankAndPass, continueRolling, resetGame } = actions;
 
   const isHumanTurn = currentTurn === 'human';
   const hasNewlyHeld = dice.some((d) => d.isHeld && !d.isLocked);
@@ -94,6 +95,22 @@ export default function App() {
 
   const isBust = gamePhase === 'bust';
   const isHotDice = gamePhase === 'hotdice';
+
+  // Track which combo card is highlighted (cleared on phase change)
+  const [activeComboKey, setActiveComboKey] = useState(null);
+  useEffect(() => {
+    setActiveComboKey(null);
+  }, [gamePhase]);
+
+  const handleDieClick = (dieId) => {
+    setActiveComboKey(null);
+    toggleHold(dieId);
+  };
+
+  const handleSelectCombo = (comboDice, key) => {
+    setActiveComboKey(key);
+    selectCombo(comboDice);
+  };
 
   return (
     <div
@@ -164,10 +181,19 @@ export default function App() {
               die={die}
               isBust={isBust}
               isHotDice={isHotDice}
-              onClick={isHumanTurn && gamePhase === 'selecting' ? () => toggleHold(die.id) : undefined}
+              onClick={isHumanTurn && gamePhase === 'selecting' ? () => handleDieClick(die.id) : undefined}
             />
           ))}
         </div>
+
+        {/* Combo Panel — only shown to human during selecting phase */}
+        {gamePhase === 'selecting' && isHumanTurn && (
+          <ComboPanel
+            dice={dice}
+            onSelectCombo={handleSelectCombo}
+            activeComboKey={activeComboKey}
+          />
+        )}
 
         {/* Turn Score */}
         <div style={{ textAlign: 'center', padding: '0.9rem 0 0.4rem' }}>

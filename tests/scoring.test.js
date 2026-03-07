@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getValidTakes, isBust } from '../src/engine/scoring.js';
+import { scoreSubset, getValidTakes, isBust } from '../src/engine/scoring.js';
 
 const hasTake = (takes, score) => takes.some((t) => t.score === score);
 
@@ -30,6 +30,32 @@ const allTakesTight = (takes) =>
 describe('isBust', () => {
   it('1. clean bust roll [2,3,4,6,2,3] → bust', () => {
     expect(isBust([2, 3, 4, 6, 2, 3])).toBe(true);
+  });
+
+  it('1b. roll with scoring dice [1,2,3,4,5,6] → not a bust', () => {
+    expect(isBust([1, 2, 3, 4, 5, 6])).toBe(false);
+  });
+});
+
+describe('scoreSubset direct', () => {
+  it('S1. three 1s → 1000', () => {
+    expect(scoreSubset([1, 1, 1])).toBe(1000);
+  });
+
+  it('S2. four 1s → 2000 (doubling formula: 1000 × 2^1)', () => {
+    expect(scoreSubset([1, 1, 1, 1])).toBe(2000);
+  });
+
+  it('S3. triple 5s → 500 (via N-of-a-kind path, not straight)', () => {
+    expect(scoreSubset([5, 5, 5])).toBe(500);
+  });
+
+  it('S4. triple 1s + lone 5 → 1050', () => {
+    expect(scoreSubset([1, 1, 1, 5])).toBe(1050);
+  });
+
+  it('S5. two triplets [2,2,2,5,5,5] → 700 (200 + 500)', () => {
+    expect(scoreSubset([2, 2, 2, 5, 5, 5])).toBe(700);
   });
 });
 
@@ -81,6 +107,21 @@ describe('getValidTakes', () => {
   it('13. mixed roll [1,1,5,2,3,4] → returns multiple valid takes', () => {
     const takes = getValidTakes([1, 1, 5, 2, 3, 4]);
     expect(takes.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('13b. four 1s [1,1,1,1,2,3] → includes take worth 2000', () => {
+    expect(hasTake(getValidTakes([1, 1, 1, 1, 2, 3]), 2000)).toBe(true);
+  });
+
+  it('13c. triple 5s [5,5,5,2,3,4] → includes take worth 500 (3-die take, not straight)', () => {
+    const takes = getValidTakes([5, 5, 5, 2, 3, 4]);
+    const tripleFives = takes.find((t) => t.score === 500);
+    expect(tripleFives).toBeDefined();
+    expect(tripleFives.dice).toEqual([5, 5, 5]); // must be exactly 3 dice
+  });
+
+  it('13d. two triplets [2,2,2,5,5,5] → includes combined take worth 700', () => {
+    expect(hasTake(getValidTakes([2, 2, 2, 5, 5, 5]), 700)).toBe(true);
   });
 });
 

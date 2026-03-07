@@ -41,12 +41,27 @@ export function scoreSubset(dice) {
 }
 
 /**
+ * Returns true if every element of `smaller` can be matched in `larger` (multiset subset check).
+ */
+function isMultisetSubset(smaller, larger) {
+  const remaining = [...larger];
+  for (const v of smaller) {
+    const idx = remaining.indexOf(v);
+    if (idx === -1) return false;
+    remaining.splice(idx, 1);
+  }
+  return true;
+}
+
+/**
  * Returns all valid scoring takes from a single dice roll.
  * Each take is { dice: number[], score: number }.
  * Includes ALL valid subsets (not just highest scoring), so players can choose
  * to break combos strategically.
+ * Dominated takes are filtered out: if a proper sub-take achieves the same score,
+ * the larger take is invalid (it contains free-rider dice that contribute nothing).
  *
- * @param {number[]} diceRoll - Array of 6 integers (1-6)
+ * @param {number[]} diceRoll - Array of integers (1-6)
  * @returns {{ dice: number[], score: number }[]}
  */
 export function getValidTakes(diceRoll) {
@@ -70,7 +85,18 @@ export function getValidTakes(diceRoll) {
     }
   }
 
-  return takes;
+  // Remove dominated takes: any take T where a proper sub-take with the same score exists.
+  // This eliminates free-rider dice — non-contributing dice alongside scoring ones.
+  return takes.filter(
+    (t) =>
+      !takes.some(
+        (other) =>
+          other !== t &&
+          other.score === t.score &&
+          other.dice.length < t.dice.length &&
+          isMultisetSubset(other.dice, t.dice)
+      )
+  );
 }
 
 /**

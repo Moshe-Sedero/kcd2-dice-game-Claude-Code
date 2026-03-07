@@ -3,6 +3,30 @@ import { getValidTakes, isBust } from '../src/engine/scoring.js';
 
 const hasTake = (takes, score) => takes.some((t) => t.score === score);
 
+// Returns true if every element of `smaller` appears in `larger` (multiset)
+const isMultisetSubset = (smaller, larger) => {
+  const rem = [...larger];
+  for (const v of smaller) {
+    const i = rem.indexOf(v);
+    if (i === -1) return false;
+    rem.splice(i, 1);
+  }
+  return true;
+};
+
+// A take is "tight" if no other take with the same score is a proper subset of it
+const allTakesTight = (takes) =>
+  takes.every(
+    (t) =>
+      !takes.some(
+        (other) =>
+          other !== t &&
+          other.score === t.score &&
+          other.dice.length < t.dice.length &&
+          isMultisetSubset(other.dice, t.dice)
+      )
+  );
+
 describe('isBust', () => {
   it('1. clean bust roll [2,3,4,6,2,3] → bust', () => {
     expect(isBust([2, 3, 4, 6, 2, 3])).toBe(true);
@@ -57,5 +81,50 @@ describe('getValidTakes', () => {
   it('13. mixed roll [1,1,5,2,3,4] → returns multiple valid takes', () => {
     const takes = getValidTakes([1, 1, 5, 2, 3, 4]);
     expect(takes.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('no free-rider dice (dominated-take filter)', () => {
+  it('14. singleton roll [1,3,4,6,6,2] → only take is [1]=100, no free riders', () => {
+    const takes = getValidTakes([1, 3, 4, 6, 6, 2]);
+    expect(takes).toHaveLength(1);
+    expect(takes[0].dice).toEqual([1]);
+    expect(takes[0].score).toBe(100);
+  });
+
+  it('15. two singletons [1,5,2,2,6,6] → exactly [1]=100, [5]=50, [1,5]=150', () => {
+    // Roll has no triples and no straights — only 1 and 5 can score
+    const takes = getValidTakes([1, 5, 2, 2, 6, 6]);
+    expect(takes).toHaveLength(3);
+    expect(hasTake(takes, 100)).toBe(true);
+    expect(hasTake(takes, 50)).toBe(true);
+    expect(hasTake(takes, 150)).toBe(true);
+    expect(allTakesTight(takes)).toBe(true);
+  });
+
+  it('16. three-of-a-kind [6,6,6,2,3,4] → only take is [6,6,6]=600, no [6,6,6,2] etc.', () => {
+    const takes = getValidTakes([6, 6, 6, 2, 3, 4]);
+    expect(takes).toHaveLength(1);
+    expect(takes[0].dice).toEqual([6, 6, 6]);
+    expect(takes[0].score).toBe(600);
+  });
+
+  it('17. all takes are tight for mixed roll [1,1,5,2,3,4]', () => {
+    const takes = getValidTakes([1, 1, 5, 2, 3, 4]);
+    expect(allTakesTight(takes)).toBe(true);
+    // 6 tight takes: [1]=100, [5]=50, [1,1]=200, [1,5]=150, [1,1,5]=250,
+    // plus small straight [1,2,3,4,5]=500 (uses one of the two 1s)
+    expect(takes).toHaveLength(6);
+  });
+
+  it('18. three-of-a-kind breakout [1,1,1,2,3,4] → tight takes only ([1],[1,1],[1,1,1])', () => {
+    const takes = getValidTakes([1, 1, 1, 2, 3, 4]);
+    expect(allTakesTight(takes)).toBe(true);
+    expect(hasTake(takes, 100)).toBe(true);   // [1]
+    expect(hasTake(takes, 200)).toBe(true);   // [1,1]
+    expect(hasTake(takes, 1000)).toBe(true);  // [1,1,1]
+    // No free-rider combos like [1,3]=100 or [1,1,4]=200
+    const hasFreerider = takes.some((t) => t.dice.some((v) => v === 2 || v === 3 || v === 4));
+    expect(hasFreerider).toBe(false);
   });
 });
